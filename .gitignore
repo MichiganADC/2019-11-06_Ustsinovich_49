@@ -5,7 +5,7 @@ helpers.py
 __pycache__/*
 data/*
 *.csv
-*.xlx*
+*.xls*
 *.txt
 *.doc*
 *.pdf

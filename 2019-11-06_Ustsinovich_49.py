@@ -3,6 +3,8 @@
 
 import numpy as np
 import pandas as pd
+import swifter
+import re
 import helpers
 import config
 
@@ -11,6 +13,18 @@ import config
 # Extract
 ################################################################################
 
+# ARMADA
+
+fields_ar_raw = [
+    "subject_id"
+    , "ummap_id"
+]
+fields_ar = ','.join(fields_ar_raw)
+
+df_ar = helpers.export_redcap_records(
+    token=config.REDCAP_API_TOKEN_ARMADA
+    , fields=fields_ar
+)
 
 # MiNDSet Registry
 
@@ -65,15 +79,49 @@ df_st = pd.read_excel("./data/STIM and UMMAP Co-Enrollment w PET Scan.xlsx")
 
 
 
+
+
 ################################################################################
 # Transform
 ################################################################################
+
+# ARMADA
+
+df_ar.head()
+df_ar.shape
+
+df_ar = df_ar[df_ar['subject_id'] > 0]
+
+df_ar_cln = df_ar.copy(deep=True)
+df_ar_cln.columns
+df_ar_cln['subject_id'] = df_ar_cln['subject_id'].astype(str)
+df_ar_cln = df_ar_cln[df_ar_cln['ummap_id'].notnull()]
+
+def clean_umid(str_id):
+    if re.match(r'^\d{3}$', str_id):
+        return("UM00000" + str_id)
+    elif re.match(r'^\d{4}$', str_id):
+        return("UM0000" + str_id)
+    elif re.match(r'^UM0000\d{4}$', str_id):
+        return(str_id)
+    else:
+        return np.nan
+
+df_ar_cln_um = \
+    df_ar_cln[df_ar_cln['ummap_id'].str.contains(r'^\d{3,4}$|^UM\d{8}$')]
+df_ar_cln_um.loc[:, 'ummap_id'] = \
+    pd.Series(df_ar_cln_um['ummap_id']).apply(clean_umid)
+
+ids_ar = \
+    pd.Series(df_ar_cln_um.loc[:, 'ummap_id'].unique()).sort_values()
 
 
 # MiNDSet Registry
 
 df_ms.head()
 df_ms.shape
+
+# df_ms = df_ms[df_ms['subject_id'].isin(ids_ar)]
 
 # APOE
 fields_u3_apoe = [
@@ -126,6 +174,8 @@ df_rv.head()
 df_rv.shape
 df_rv.columns
 
+# df_rv = df_rv[df_rv['subject_id'].isin(ids_ar)]
+
 df_rv_cln = df_rv.loc[:, fields_rv_raw]
 
 # Filter for records that have:
@@ -146,6 +196,8 @@ ids_rv = \
 df_st.head()
 df_st.shape
 df_st.columns
+
+# df_st = df_st[df_st['subject_id'].isin(ids_ar)]
 
 df_st_cln = df_st[df_st['PET Scan'] == "Yes"]
 
@@ -209,6 +261,7 @@ df_um_cln_mut = df_um_cln.copy(deep=True)
 df_um_cln_mut['age'] = \
     (df_um_cln_mut['exam_date'] - df_um_cln_mut['birth_date']).\
     astype('timedelta64[Y]')
+df_um_cln_mut = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_ar)]
 
 # fields_um_keeper = ['subject_id', 'age', 'race_value', 'uds_dx']
 # df_um_cln_mut = df_um_cln_mut[fields_um_keeper]
@@ -241,43 +294,45 @@ df_pet = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_pet)].\
 
 # Completed Baseline
 
-df_um_cln_mut_bl = df_um_cln_mut.drop_duplicates(subset=['subject_id'], keep="first")
+df_um_cln_mut_rec = \
+    df_um_cln_mut.drop_duplicates(subset=['subject_id'], keep="last")
+
 codes_mci = pd.Series([1, 2, 31, 34])
 codes_ad = pd.Series([3, 4])
 
 # NC 65-85; NL = 26
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['age'] >= 65) &
-                     (df_um_cln_mut_bl['age'] <= 85) &
-                     (df_um_cln_mut_bl['uds_dx'] == 26)].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['age'] >= 65) &
+                      (df_um_cln_mut_rec['age'] <= 85) &
+                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
 
 # MCI; MCI = 1,2,31,34
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
 
 # 85+
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['age'] > 85)].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['age'] > 85)].index)
 
 # AD; AD = 3,4
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['uds_dx'].isin(codes_ad))].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
 
 # AA MCI; Black = 2
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['race_value'] == 2) &
-                     (df_um_cln_mut_bl['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
+                      (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
 
 # AA NC
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['race_value'] == 2) &
-                     (df_um_cln_mut_bl['uds_dx'] == 26)].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
+                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
 
 # Spa MCI; Hispanic = 4
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['race_value'] == 4) &
-                     (df_um_cln_mut_bl['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
+                      (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
 
 # Spa NC
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['race_value'] == 4) &
-                     (df_um_cln_mut_bl['uds_dx'] == 26)].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
+                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
 
 # Spa AD
-len(df_um_cln_mut_bl[(df_um_cln_mut_bl['race_value'] == 4) &
-                     (df_um_cln_mut_bl['uds_dx'].isin(codes_ad))].index)
+len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
+                      (df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
 
 # Biomarkers Collected - Amyloid PET
 
