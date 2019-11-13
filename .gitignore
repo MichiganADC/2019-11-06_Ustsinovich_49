@@ -1,0 +1,12 @@
+.idea/*
+venv/*
+config.py
+helpers.py
+__pycache__/*
+data/*
+*.csv
+*.xlx*
+*.txt
+*.doc*
+*.pdf
+
