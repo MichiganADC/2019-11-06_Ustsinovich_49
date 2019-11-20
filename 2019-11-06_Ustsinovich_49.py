@@ -27,7 +27,8 @@ import config
 #     , fields=fields_ar
 # )
 
-df_ar = pd.read_excel("./data/ARMADA Enrollment IDs.xlsx")
+# df_ar = pd.read_excel("./data/ARMADA Enrollment IDs.xlsx")
+df_ar = pd.read_excel("./data/ARMADA Enrollment IDs 2.xlsx", parse_dates=True)
 
 # MiNDSet Registry
 
@@ -85,6 +86,8 @@ df_st = pd.read_excel("./data/STIM and UMMAP Co-Enrollment w PET Scan.xlsx")
 
 df_ar.head()
 df_ar.shape
+df_ar.columns
+df_ar.columns = ['subject_id', 'armada_date', 'exam_date']
 
 # df_ar = df_ar[(df_ar['subject_id'] > 0)]
 
@@ -112,10 +115,10 @@ def clean_umid(str_id):
 #     df_ar_cln[df_ar_cln['ummap_id'].str.contains(r'^\d{3,4}$|^UM\d{8}$')]
 # df_ar_cln_um = \
 #     df_ar_cln_um.assign(ummap_id=df_ar_cln_um['ummap_id'].apply(clean_umid))
-df_ar_cln_um = df_ar.assign(ummap_id=df_ar['ummap_id'].apply(clean_umid))
+df_ar_cln_um = df_ar.assign(subject_id=df_ar['subject_id'].apply(clean_umid))
 
 ids_ar = \
-    pd.Series(df_ar_cln_um.loc[:, 'ummap_id'].unique()).sort_values()
+    pd.Series(df_ar_cln_um.loc[:, 'subject_id'].unique()).sort_values()
 
 # MiNDSet Registry
 
@@ -264,20 +267,32 @@ df_um_cln_mut = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_ar)]
 
 # APOE
 
+# df_apoe = \
+#     df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_apoe)]. \
+#         drop_duplicates(subset=['subject_id'], keep="last")
 df_apoe = \
-    df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_apoe)]. \
-        drop_duplicates(subset=['subject_id'], keep="last")
+    pd.merge(df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_apoe)],
+             df_ar_cln_um,
+             how="inner", on=['subject_id', 'exam_date'])
 
 # MRI
 
+# df_mri = \
+#     df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_mri)]. \
+#         drop_duplicates(subset=['subject_id'], keep="last")
 df_mri = \
-    df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_mri)]. \
-        drop_duplicates(subset=['subject_id'], keep="last")
+    pd.merge(df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_mri)],
+             df_ar_cln_um,
+             how="inner", on=['subject_id', 'exam_date'])
 
 # PET
 
-df_pet = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_pet)]. \
-    drop_duplicates(subset=['subject_id'], keep="last")
+# df_pet = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_pet)]. \
+#     drop_duplicates(subset=['subject_id'], keep="last")
+df_pet = \
+    pd.merge(df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_pet)],
+             df_ar_cln_um,
+             how="inner", on=['subject_id', 'exam_date'])
 
 ################################################################################
 # Answer Questions
@@ -286,109 +301,112 @@ df_pet = df_um_cln_mut[df_um_cln_mut['subject_id'].isin(ids_pet)]. \
 
 # Completed Baseline
 
-df_um_cln_mut_rec = \
-    df_um_cln_mut.drop_duplicates(subset=['subject_id'], keep="last")
+# df_um_cln_mut_ar = \
+#     df_um_cln_mut.drop_duplicates(subset=['subject_id'], keep="last")
+df_um_cln_mut_ar = \
+    pd.merge(df_um_cln_mut, df_ar_cln_um,
+             how="inner", on=['subject_id', 'exam_date'])
 
-codes_mci = pd.Series([1, 2, 31, 34])
+codes_mci = pd.Series([1, 2, 27, 28, 31, 34])
 codes_ad = pd.Series([3, 4])
 
 # # NC 65-85; NL = 26
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['age'] >= 65) &
-#                       (df_um_cln_mut_rec['age'] < 86) &
-#                       (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['age'] >= 65) &
+#                       (df_um_cln_mut_ar['age'] < 85) &
+#                       (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 #
 # # MCI; MCI = 1,2,31,34
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 #
-# # 86+
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['age'] >= 86)].index)
+# # 85+
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['age'] >= 85)].index)
 #
 # # AD; AD = 3,4
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['uds_dx'].isin(codes_ad))].index)
 #
 # # AA MCI; Black = 2
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
-#                       (df_um_cln_mut_rec['age'] >= 65) &
-#                       (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 2) &
+#                       (df_um_cln_mut_ar['age'] >= 65) &
+#                       (df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 #
 # # AA NC
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
-#                       (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 2) &
+#                       (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 #
 # # Spa MCI; Hispanic = 4
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-#                       (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+#                       (df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 #
 # # Spa NC
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-#                       (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+#                       (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 #
 # # Spa AD
-# len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-#                       (df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
+# len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+#                       (df_um_cln_mut_ar['uds_dx'].isin(codes_ad))].index)
 
 # WHITE, 65-85, NL
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 1) &
-                      ((df_um_cln_mut_rec['age'] >= 65) &
-                       (df_um_cln_mut_rec['age'] < 86)) &
-                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 1) &
+                      ((df_um_cln_mut_ar['age'] >= 65) &
+                       (df_um_cln_mut_ar['age'] < 85)) &
+                      (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 
 # WHITE, 65+, MCI
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 1) &
-                      (df_um_cln_mut_rec['age'] >= 65) &
-                      (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 1) &
+                      (df_um_cln_mut_ar['age'] >= 65) &
+                      (df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 
-# WHITE & AA, 86+, NL
-len(df_um_cln_mut_rec[((df_um_cln_mut_rec['race_value'] == 1) |
-                       (df_um_cln_mut_rec['race_value'] == 2)) &
-                      (df_um_cln_mut_rec['age'] >= 86) &
-                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# WHITE & AA, 85+, NL
+len(df_um_cln_mut_ar[((df_um_cln_mut_ar['race_value'] == 1) |
+                       (df_um_cln_mut_ar['race_value'] == 2)) &
+                      (df_um_cln_mut_ar['age'] >= 85) &
+                      (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 
 # WHITE & AA, 65+, AD
-len(df_um_cln_mut_rec[((df_um_cln_mut_rec['race_value'] == 1) |
-                       (df_um_cln_mut_rec['race_value'] == 2)) &
-                      (df_um_cln_mut_rec['age'] >= 65) &
-                      (df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
+len(df_um_cln_mut_ar[((df_um_cln_mut_ar['race_value'] == 1) |
+                       (df_um_cln_mut_ar['race_value'] == 2)) &
+                      (df_um_cln_mut_ar['age'] >= 65) &
+                      (df_um_cln_mut_ar['uds_dx'].isin(codes_ad))].index)
 
 # AA, 65+, MCI
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
-                      (df_um_cln_mut_rec['age'] >= 65) &
-                      (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 2) &
+                      (df_um_cln_mut_ar['age'] >= 65) &
+                      (df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 
-# AA, 65-85, NL
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 2) &
-                      ((df_um_cln_mut_rec['age'] >= 65) &
-                       (df_um_cln_mut_rec['age'] < 86)) &
-                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# AA, 65-84, NL
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 2) &
+                      ((df_um_cln_mut_ar['age'] >= 65) &
+                       (df_um_cln_mut_ar['age'] < 85)) &
+                      (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 
 # Spa, 65+, MCI
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-                      (df_um_cln_mut_rec['age'] >= 65) &
-                      (df_um_cln_mut_rec['uds_dx'].isin(codes_mci))].index)
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+                      (df_um_cln_mut_ar['age'] >= 65) &
+                      (df_um_cln_mut_ar['uds_dx'].isin(codes_mci))].index)
 
-# Spa, 65-85, NL
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-                      ((df_um_cln_mut_rec['age'] >= 65) &
-                       (df_um_cln_mut_rec['age'] < 86)) &
-                      (df_um_cln_mut_rec['uds_dx'] == 26)].index)
+# Spa, 65-84, NL
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+                      ((df_um_cln_mut_ar['age'] >= 65) &
+                       (df_um_cln_mut_ar['age'] < 85)) &
+                      (df_um_cln_mut_ar['uds_dx'] == 26)].index)
 
 # Spa, 65+, AD
-len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
-                      (df_um_cln_mut_rec['age'] >= 65) &
-                      (df_um_cln_mut_rec['uds_dx'].isin(codes_ad))].index)
+len(df_um_cln_mut_ar[(df_um_cln_mut_ar['race_value'] == 4) &
+                      (df_um_cln_mut_ar['age'] >= 65) &
+                      (df_um_cln_mut_ar['uds_dx'].isin(codes_ad))].index)
 
 # Biomarkers Collected - Amyloid PET
 
-# # NC 65-85; NL = 26
+# # NC 65-84; NL = 26
 # len(df_pet[(df_pet['age'] >= 65) &
-#            (df_pet['age'] < 86) &
+#            (df_pet['age'] < 85) &
 #            (df_pet['uds_dx'] == 26)].index)
 #
 # # MCI; MCI = 1,2,31,34
 # len(df_pet[(df_pet['uds_dx']).isin(codes_mci)].index)
 #
-# # 86+
-# len(df_pet[(df_pet['age'] >= 86)].index)
+# # 85+
+# len(df_pet[(df_pet['age'] >= 85)].index)
 #
 # # AD; AD = 3,4
 # len(df_pet[(df_pet['uds_dx'].isin(codes_ad))].index)
@@ -413,10 +431,10 @@ len(df_um_cln_mut_rec[(df_um_cln_mut_rec['race_value'] == 4) &
 # len(df_pet[(df_pet['race_value'] == 4) &
 #            (df_pet['uds_dx'].isin(codes_ad))].index)
 
-# WHITE, 65-85, NL
+# WHITE, 65-84, NL
 len(df_pet[(df_pet['race_value'] == 1) &
            ((df_pet['age'] >= 65) &
-            (df_pet['age'] < 86)) &
+            (df_pet['age'] < 85)) &
            (df_pet['uds_dx'] == 26)].index)
 
 # WHITE, 65+, MCI
@@ -424,10 +442,10 @@ len(df_pet[(df_pet['race_value'] == 1) &
            (df_pet['age'] >= 65) &
            (df_pet['uds_dx']).isin(codes_mci)].index)
 
-# WHITE & AA, 86+, NL
+# WHITE & AA, 85+, NL
 len(df_pet[((df_pet['race_value'] == 1) |
             (df_pet['race_value'] == 2)) &
-           (df_pet['age'] >= 86) &
+           (df_pet['age'] >= 85) &
            (df_pet['uds_dx'] == 26)].index)
 
 # WHITE & AA, 65+, AD
@@ -441,10 +459,10 @@ len(df_pet[(df_pet['race_value'] == 2) &
            (df_pet['age'] >= 65) &
            (df_pet['uds_dx'].isin(codes_mci))].index)
 
-# AA, 65-85, NL
+# AA, 65-84, NL
 len(df_pet[(df_pet['race_value'] == 2) &
            ((df_pet['age'] >= 65) &
-            (df_pet['age'] < 86)) &
+            (df_pet['age'] < 85)) &
            (df_pet['uds_dx'] == 26)].index)
 
 # Spa, 65+, MCI
@@ -452,10 +470,10 @@ len(df_pet[(df_pet['race_value'] == 4) &
            (df_pet['age'] >= 65) &
            (df_pet['uds_dx'].isin(codes_mci))].index)
 
-# Spa, 65-85, NL
+# Spa, 65-84, NL
 len(df_pet[(df_pet['race_value'] == 4) &
            ((df_pet['age'] >= 65) &
-            (df_pet['age'] < 86)) &
+            (df_pet['age'] < 85)) &
            (df_pet['uds_dx'] == 26)].index)
 
 # Spa, 65+, AD
@@ -465,16 +483,16 @@ len(df_pet[(df_pet['race_value'] == 4) &
 
 # Biomarkers Collected - Structural MRI
 
-# # NC 65-85; NL = 26
+# # NC 65-84; NL = 26
 # len(df_mri[(df_mri['age'] >= 65) &
-#            (df_mri['age'] < 86) &
+#            (df_mri['age'] < 85) &
 #            (df_mri['uds_dx'] == 26)].index)
 #
 # # MCI; MCI = 1,2,31,34
 # len(df_mri[(df_mri['uds_dx']).isin(codes_mci)].index)
 #
-# # 86+
-# len(df_mri[(df_mri['age'] >= 86)].index)
+# # 85+
+# len(df_mri[(df_mri['age'] >= 85)].index)
 #
 # # AD; AD = 3,4
 # len(df_mri[(df_mri['uds_dx'].isin(codes_ad))].index)
@@ -499,10 +517,10 @@ len(df_pet[(df_pet['race_value'] == 4) &
 # len(df_mri[(df_mri['race_value'] == 4) &
 #            (df_mri['uds_dx'].isin(codes_ad))].index)
 
-# WHITE, 65-85, NL
+# WHITE, 65-84, NL
 len(df_mri[(df_mri['race_value'] == 1) &
            ((df_mri['age'] >= 65) &
-            (df_mri['age'] < 86)) &
+            (df_mri['age'] < 85)) &
            (df_mri['uds_dx'] == 26)].index)
 
 # WHITE, 65+, MCI
@@ -510,10 +528,10 @@ len(df_mri[(df_mri['race_value'] == 1) &
            (df_mri['age'] >= 65) &
            (df_mri['uds_dx']).isin(codes_mci)].index)
 
-# WHITE & AA, 86+, NL
+# WHITE & AA, 85+, NL
 len(df_mri[((df_mri['race_value'] == 1) |
             (df_mri['race_value'] == 2)) &
-           (df_mri['age'] >= 86) &
+           (df_mri['age'] >= 85) &
            (df_mri['uds_dx'] == 26)].index)
 
 # WHITE & AA, 65+, AD
@@ -527,10 +545,10 @@ len(df_mri[(df_mri['race_value'] == 2) &
            (df_mri['age'] >= 65) &
            (df_mri['uds_dx'].isin(codes_mci))].index)
 
-# AA, 65-85, NL
+# AA, 65-84, NL
 len(df_mri[(df_mri['race_value'] == 2) &
            ((df_mri['age'] >= 65) &
-            (df_mri['age'] < 86)) &
+            (df_mri['age'] < 85)) &
            (df_mri['uds_dx'] == 26)].index)
 
 # Spa, 65+, MCI
@@ -538,10 +556,10 @@ len(df_mri[(df_mri['race_value'] == 4) &
            (df_mri['age'] >= 65) &
            (df_mri['uds_dx'].isin(codes_mci))].index)
 
-# Spa, 65-85, NL
+# Spa, 65-84, NL
 len(df_mri[(df_mri['race_value'] == 4) &
            ((df_mri['age'] >= 65) &
-            (df_mri['age'] < 86)) &
+            (df_mri['age'] < 85)) &
            (df_mri['uds_dx'] == 26)].index)
 
 # Spa, 65+, AD
@@ -551,16 +569,16 @@ len(df_mri[(df_mri['race_value'] == 4) &
 
 # Biomarkers Collected - APOE
 
-# # NC 65-85; NL = 26
+# # NC 65-84; NL = 26
 # len(df_apoe[(df_apoe['age'] >= 65) &
-#             (df_apoe['age'] < 86) &
+#             (df_apoe['age'] < 85) &
 #             (df_apoe['uds_dx'] == 26)].index)
 #
 # # MCI; MCI = 1,2,31,34
 # len(df_apoe[(df_apoe['uds_dx']).isin(codes_mci)].index)
 #
-# # 86+
-# len(df_apoe[(df_apoe['age'] >= 86)].index)
+# # 85+
+# len(df_apoe[(df_apoe['age'] >= 85)].index)
 #
 # # AD; AD = 3,4
 # len(df_apoe[(df_apoe['uds_dx'].isin(codes_ad))].index)
@@ -585,10 +603,10 @@ len(df_mri[(df_mri['race_value'] == 4) &
 # len(df_apoe[(df_apoe['race_value'] == 4) &
 #             (df_apoe['uds_dx'].isin(codes_ad))].index)
 
-# WHITE, 65-85, NL
+# WHITE, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 1) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26)].index)
 
 # WHITE, 65+, MCI
@@ -596,10 +614,10 @@ len(df_apoe[(df_apoe['race_value'] == 1) &
             (df_apoe['age'] >= 65) &
             (df_apoe['uds_dx']).isin(codes_mci)].index)
 
-# WHITE & AA, 86+, NL
+# WHITE & AA, 85+, NL
 len(df_apoe[((df_apoe['race_value'] == 1) |
              (df_apoe['race_value'] == 2)) &
-            (df_apoe['age'] >= 86) &
+            (df_apoe['age'] >= 85) &
             (df_apoe['uds_dx'] == 26)].index)
 
 # WHITE & AA, 65+, AD
@@ -613,10 +631,10 @@ len(df_apoe[(df_apoe['race_value'] == 2) &
             (df_apoe['age'] >= 65) &
             (df_apoe['uds_dx'].isin(codes_mci))].index)
 
-# AA, 65-85, NL
+# AA, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 2) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26)].index)
 
 # Spa, 65+, MCI
@@ -624,10 +642,10 @@ len(df_apoe[(df_apoe['race_value'] == 4) &
             (df_apoe['age'] >= 65) &
             (df_apoe['uds_dx'].isin(codes_mci))].index)
 
-# Spa, 65-85, NL
+# Spa, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 4) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26)].index)
 
 # Spa, 65+, AD
@@ -641,10 +659,10 @@ len(df_apoe[(df_apoe['race_value'] == 4) &
 df_gt = pd.read_csv("./data/genotyped2018.csv")
 ids_gt = df_gt['subject_id']
 
-# WHITE, 65-85, NL
+# WHITE, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 1) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
@@ -654,10 +672,10 @@ len(df_apoe[(df_apoe['race_value'] == 1) &
             (df_apoe['uds_dx']).isin(codes_mci) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
-# WHITE & AA, 86+, NL
+# WHITE & AA, 85+, NL
 len(df_apoe[((df_apoe['race_value'] == 1) |
              (df_apoe['race_value'] == 2)) &
-            (df_apoe['age'] >= 86) &
+            (df_apoe['age'] >= 85) &
             (df_apoe['uds_dx'] == 26) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
@@ -674,10 +692,10 @@ len(df_apoe[(df_apoe['race_value'] == 2) &
             (df_apoe['uds_dx'].isin(codes_mci)) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
-# AA, 65-85, NL
+# AA, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 2) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
@@ -687,10 +705,10 @@ len(df_apoe[(df_apoe['race_value'] == 4) &
             (df_apoe['uds_dx'].isin(codes_mci)) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
-# Spa, 65-85, NL
+# Spa, 65-84, NL
 len(df_apoe[(df_apoe['race_value'] == 4) &
             ((df_apoe['age'] >= 65) &
-             (df_apoe['age'] < 86)) &
+             (df_apoe['age'] < 85)) &
             (df_apoe['uds_dx'] == 26) &
             (df_apoe['subject_id'].isin(ids_gt))].index)
 
